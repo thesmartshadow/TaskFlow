@@ -56,15 +56,9 @@
 
         .smart-input-grid {
             display: grid;
-            grid-template-columns: 1fr 160px 140px 120px 100px;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
             gap: 1rem;
             margin-bottom: 2rem;
-        }
-
-        @media (max-width: 768px) {
-            .smart-input-grid {
-                grid-template-columns: 1fr;
-            }
         }
 
         .nexus-input {
@@ -123,22 +117,6 @@
             margin-bottom: 2rem;
         }
 
-        .hologram-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(45deg,
-                transparent,
-                var(--primary),
-                var(--secondary),
-                transparent);
-            opacity: 0.1;
-            pointer-events: none;
-        }
-
         .task-quantum {
             display: flex;
             align-items: center;
@@ -152,9 +130,9 @@
             animation: quantumEntrance 0.6s ease;
         }
 
-        .task-quantum:hover {
-            transform: translateY(-5px) rotateX(5deg);
-            box-shadow: 0 10px 30px rgba(var(--primary), 0.15);
+        .task-quantum.completed {
+            background: rgba(16, 185, 129, 0.1);
+            opacity: 0.8;
         }
 
         .quantum-checkbox {
@@ -183,6 +161,31 @@
             font-size: 1.1rem;
         }
 
+        .task-actions {
+            margin-left: auto;
+            display: flex;
+            gap: 1rem;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .task-quantum:hover .task-actions {
+            opacity: 1;
+        }
+
+        .action-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+
+        .edit-btn { color: var(--primary); }
+        .delete-btn { color: var(--danger); }
+        .flag-btn { color: var(--accent); }
+
         .stats-matrix {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -199,19 +202,18 @@
             overflow: hidden;
         }
 
-        .stat-orb::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: linear-gradient(45deg, 
-                transparent, 
-                rgba(var(--primary), 0.1), 
-                transparent);
-            transform: rotate(45deg);
-            animation: statOrb 6s linear infinite;
+        @media (max-width: 768px) {
+            .main-title {
+                font-size: 2.5rem;
+            }
+
+            .smart-input-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .quantum-btn {
+                width: 100%;
+            }
         }
 
         @keyframes titleFloat {
@@ -239,36 +241,6 @@
                 transform: translateY(0) rotateX(0);
             }
         }
-
-        @keyframes statOrb {
-            0% { transform: translateX(-100%) rotate(45deg); }
-            100% { transform: translateX(100%) rotate(45deg); }
-        }
-
-        .task-actions {
-            margin-left: auto;
-            display: flex;
-            gap: 1rem;
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-
-        .task-quantum:hover .task-actions {
-            opacity: 1;
-        }
-
-        .action-btn {
-            background: none;
-            border: none;
-            cursor: pointer;
-            padding: 0.5rem;
-            border-radius: 8px;
-            transition: all 0.3s;
-        }
-
-        .edit-btn { color: var(--primary); }
-        .delete-btn { color: var(--danger); }
-        .flag-btn { color: var(--accent); }
     </style>
 </head>
 <body>
@@ -307,7 +279,7 @@
 
         <div class="stats-matrix">
             <div class="stat-orb">
-                <h3>📊 الإحصائيات </h3>
+                <h3>📊 الإحصائيات الكمية</h3>
                 <div id="quantumStats"></div>
             </div>
             <div class="stat-orb">
@@ -342,7 +314,7 @@
                     text: input.value,
                     date: document.getElementById('taskDate').value,
                     priority: document.getElementById('taskPriority').value,
-                    tags: document.getElementById('taskTags').value.split(','),
+                    tags: document.getElementById('taskTags').value.split(',').filter(t => t.trim()),
                     completed: false,
                     flagged: false,
                     createdAt: new Date().toISOString()
@@ -394,6 +366,40 @@
                         this.tasks = this.tasks.filter(task => task.id !== id);
                         this.save();
                     }
+                });
+            }
+
+            toggleFlag(id) {
+                this.tasks = this.tasks.map(task => 
+                    task.id === id ? {...task, flagged: !task.flagged} : task
+                );
+                this.save();
+                this.animateFlag(id);
+            }
+
+            animateFlag(id) {
+                anime({
+                    targets: `[data-task-id="${id}"] .flag-btn`,
+                    scale: [1, 1.2, 1],
+                    duration: 300
+                });
+            }
+
+            editTask(id) {
+                const task = this.tasks.find(t => t.id === id);
+                const newText = prompt('عدل المهمة:', task.text);
+                if (newText !== null && newText.trim()) {
+                    task.text = newText.trim();
+                    this.save();
+                    this.animateEdit(id);
+                }
+            }
+
+            animateEdit(id) {
+                anime({
+                    targets: `[data-task-id="${id}"]`,
+                    backgroundColor: ['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.03)'],
+                    duration: 500
                 });
             }
 
@@ -469,8 +475,13 @@
             }
         }
 
+        // تهيئة النظام وتعريف الدوال العامة
         const taskManager = new QuantumTaskManager();
         window.taskManager = taskManager;
+        window.toggleTask = (id) => taskManager.toggleTask(id);
+        window.deleteTask = (id) => taskManager.deleteTask(id);
+        window.toggleFlag = (id) => taskManager.toggleFlag(id);
+        window.editTask = (id) => taskManager.editTask(id);
 
         document.addEventListener('DOMContentLoaded', () => {
             taskManager.init();
